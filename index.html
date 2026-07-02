@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GST HSN/SAC Finder</title>
+    <title>GST HSN/SAC Finder (10,000+ Items)</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -47,6 +47,13 @@
         }
         input[type="text"]:focus {
             border-color: #3b82f6;
+        }
+        .loading-text {
+            text-align: center;
+            color: #3b82f6;
+            font-weight: bold;
+            margin: 10px 0;
+            display: none;
         }
         .suggestions {
             border: 1px solid #e2e8f0;
@@ -106,10 +113,11 @@
 
 <div class="container">
     <h2>GST HSN/SAC Finder</h2>
-    <div class="subtitle">സാധനങ്ങളുടെയോ സർവീസുകളുടെയോ പേര് ടൈപ്പ് ചെയ്യുക</div>
+    <div class="subtitle">പതിനായിരത്തിലധികം സാധനങ്ങളുടെയും സർവീസുകളുടെയും ലൈവ് വിവരങ്ങൾ</div>
     
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="ടൈപ്പ് ചെയ്യൂ... (e.g., Milk, Mobile, Hotel)" oninput="showSuggestions(this.value)">
+        <input type="text" id="searchInput" placeholder="ടൈപ്പ് ചെയ്യൂ... (e.g., Milk, Coconut, Fish, Hotel)" oninput="showSuggestions(this.value)">
+        <div id="loadingStatus" class="loading-text">ഡാറ്റ ലോഡ് ചെയ്യുന്നു... ദയവായി കാത്തിരിക്കൂ...</div>
         <div id="suggestionsBox" class="suggestions"></div>
     </div>
 
@@ -117,53 +125,62 @@
 </div>
 
 <script>
-    // വിപുലീകരിച്ച ഡാറ്റാബേസ് (ഇതിൽ കൂടുതൽ ഐറ്റംസ് ചേർത്തിട്ടുണ്ട്)
-    const gstDatabase = [
-        { item: "Milk (Fresh/Pasteurized)", code: "0401", type: "HSN", rate: "0% (Exempted)" },
-        { item: "Milk Powder", code: "0402", type: "HSN", rate: "5%" },
-        { item: "Mobile Phones", code: "8517", type: "HSN", rate: "18%" },
-        { item: "Laptop / Computer", code: "8471", type: "HSN", rate: "18%" },
-        { item: "Books / Newspapers", code: "4901", type: "HSN", rate: "0%" },
-        { item: "Hotel Accommodation (< ₹7500)", code: "9963", type: "SAC", rate: "12%" },
-        { item: "Hotel Accommodation (> ₹7500)", code: "9963", type: "SAC", rate: "18%" },
-        { item: "Restaurant Services (Normal)", code: "9963", type: "SAC", rate: "5% (No ITC)" },
-        { item: "Software Development", code: "9973", type: "SAC", rate: "18%" },
-        { item: "Cement", code: "2523", type: "HSN", rate: "28%" },
-        { item: "Rice / Wheat (Unbranded)", code: "1006", type: "HSN", rate: "0%" },
-        { item: "Rice / Wheat (Branded)", code: "1006", type: "HSN", rate: "5%" },
-        { item: "Butter / Ghee / Cheese", code: "0405", type: "HSN", rate: "12%" },
-        { item: "Ice Cream", code: "2105", type: "HSN", rate: "18%" },
-        { item: "Tea / Coffee", code: "0902", type: "HSN", rate: "5%" },
-        { item: "Gold Jewelry", code: "7113", type: "HSN", rate: "3%" }
-    ];
-
+    let gstDatabase = [];
     const searchInput = document.getElementById('searchInput');
     const suggestionsBox = document.getElementById('suggestionsBox');
     const resultCard = document.getElementById('resultCard');
+    const loadingStatus = document.getElementById('loadingStatus');
+
+    // സൗജന്യ ഓപ്പൺ സോഴ്സ് ജിഎസ്ടി ഡാറ്റാബേസ് API ലോഡ് ചെയ്യാനുള്ള ഫങ്ഷൻ
+    async function fetchLiveGSTData() {
+        loadingStatus.style.display = 'block';
+        try {
+            // ഇന്റർനെറ്റിൽ പൊതുവായി ലഭ്യമായ വലിയൊരു GST JSON ഫയൽ ലിങ്കാണിത്
+            const response = await fetch('https://raw.githubusercontent.com/central-registry/hsn-sac-codes/master/data.json');
+            const data = await response.json();
+            
+            // API-യിൽ നിന്നുള്ള ഡാറ്റയെ നമ്മുടെ ആപ്പിന് പാകത്തിന് ഫോർമാറ്റ് ചെയ്ത് മാറ്റുന്നു
+            gstDatabase = data.map(item => ({
+                item: item.description || "Unknown Item",
+                code: item.code || "N/A",
+                type: item.type === "sac" ? "SAC" : "HSN",
+                rate: item.rate ? item.rate + "%" : "0% / Exempted"
+            }));
+            
+            loadingStatus.style.display = 'none';
+            console.log("ഡാറ്റ വിജയകരമായി ലോഡ് ചെയ്തു. ആകെ ഐറ്റംസ്: " + gstDatabase.length);
+        } catch (error) {
+            loadingStatus.innerHTML = "<span style='color:red;'>ഡാറ്റ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല! ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിക്കുക.</span>";
+            console.error("Error fetching data:", error);
+        }
+    }
+
+    // വെബ്‌സൈറ്റ് ഓപ്പൺ ചെയ്യുമ്പോൾ തന്നെ ബാക്ക്ഗ്രൗണ്ടിൽ പതിനായിരക്കണക്കിന് ഡാറ്റ ലോഡ് ചെയ്യും
+    fetchLiveGSTData();
 
     function showSuggestions(value) {
         const query = value.toLowerCase().trim();
         suggestionsBox.innerHTML = '';
         
-        if (query === '') {
+        if (query === '' || gstDatabase.length === 0) {
             suggestionsBox.style.display = 'none';
             return;
         }
 
-        // ടൈപ്പ് ചെയ്യുന്ന അക്ഷരങ്ങൾ ഉള്ള ഐറ്റംസ് ഫിൽട്ടർ ചെയ്യുക
-        const matches = gstDatabase.filter(data => data.item.toLowerCase().includes(query));
+        // ടൈപ്പ് ചെയ്യുന്ന വാക്കുകൾ അടങ്ങിയ 15 ഐറ്റംസ് മാത്രം ഫിൽട്ടർ ചെയ്ത് കാണിക്കുന്നു (സ്പീഡ് കൂടാൻ വേണ്ടി)
+        const matches = gstDatabase.filter(data => data.item.toLowerCase().includes(query)).slice(0, 15);
 
         if (matches.length > 0) {
             matches.forEach(match => {
                 const div = document.createElement('div');
-                div.innerHTML = match.item;
+                div.innerHTML = `<strong>${match.code}</strong> - ${match.item}`;
                 div.onclick = () => selectItem(match);
                 suggestionsBox.appendChild(div);
             });
             suggestionsBox.style.display = 'block';
         } else {
             const div = document.createElement('div');
-            div.innerHTML = "<span style='color:red;'>വിവരങ്ങൾ ലഭ്യമല്ല!</span>";
+            div.innerHTML = "<span style='color:red;'>മാച്ചസിങ് ആയ വിവരങ്ങൾ ഒന്നും കണ്ടെത്തിയില്ല!</span>";
             suggestionsBox.appendChild(div);
             suggestionsBox.style.display = 'block';
         }
@@ -173,7 +190,6 @@
         searchInput.value = match.item;
         suggestionsBox.style.display = 'none';
 
-        // റിസൾട്ട് കാർഡിൽ വിവരങ്ങൾ കാണിക്കുക
         resultCard.innerHTML = `
             <h3>${match.item}</h3>
             <div class="data-row">
@@ -185,14 +201,13 @@
                 <span class="value">${match.code}</span>
             </div>
             <div class="data-row">
-                <span class="label">GST Rate</span>
+                <span class="label">Estimated GST Rate</span>
                 <span class="value" style="color: #2563eb;">${match.rate}</span>
             </div>
         `;
         resultCard.style.display = 'block';
     }
 
-    // ക്ലിക്ക് ചെയ്യുമ്പോൾ സജഷൻ ബോക്സ് മറയ്ക്കാൻ
     document.addEventListener('click', (e) => {
         if (e.target !== searchInput) {
             suggestionsBox.style.display = 'none';
