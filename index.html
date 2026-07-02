@@ -6,120 +6,198 @@
     <title>GST HSN/SAC Finder</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f7f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
             margin: 0;
             padding: 20px;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: center;
         }
         .container {
-            max-width: 600px;
+            max-width: 650px;
             width: 100%;
             background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
         h2 {
             text-align: center;
-            color: #333;
+            color: #1e3a8a;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .search-box {
+            position: relative;
         }
         input[type="text"] {
             width: 100%;
-            padding: 12px;
-            margin: 10px 0;
+            padding: 14px;
             box-sizing: border-box;
-            border: 2px solid #ccc;
-            border-radius: 4px;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
             font-size: 16px;
+            outline: none;
+            transition: 0.3s;
         }
-        button {
+        input[type="text"]:focus {
+            border-color: #3b82f6;
+        }
+        .suggestions {
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            background: white;
+            position: absolute;
             width: 100%;
-            background-color: #4CAF50;
-            color: white;
+            z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: none;
+        }
+        .suggestions div {
             padding: 12px;
-            border: none;
-            border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
+            border-bottom: 1px solid #f1f5f9;
         }
-        button:hover {
-            background-color: #45a049;
+        .suggestions div:hover {
+            background-color: #f8fafc;
+            color: #3b82f6;
         }
-        .result-box {
+        .result-card {
             margin-top: 20px;
-            padding: 15px;
-            background: #e7f3fe;
-            border-left: 6px solid #2196F3;
+            padding: 20px;
+            background: #eff6ff;
+            border-radius: 8px;
+            border-left: 6px solid #3b82f6;
             display: none;
         }
-        .error-box {
-            margin-top: 20px;
-            padding: 15px;
-            background: #fde8e8;
-            border-left: 6px solid #f44336;
-            color: #d32f2f;
-            display: none;
+        .result-card h3 {
+            margin-top: 0;
+            color: #1e40af;
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .data-row:last-child {
+            border-bottom: none;
+        }
+        .label { font-weight: bold; color: #475569; }
+        .value { color: #0f172a; font-weight: 600; }
+        .badge {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>GST HSN/SAC Code Finder</h2>
-    <p>സാധനങ്ങളുടെയോ സർവീസുകളുടെയോ പേര് നൽകി സെർച്ച് ചെയ്യുക (ഉദാഹരണത്തിന്: Mobile, Laptop, Hotel)</p>
+    <h2>GST HSN/SAC Finder</h2>
+    <div class="subtitle">സാധനങ്ങളുടെയോ സർവീസുകളുടെയോ പേര് ടൈപ്പ് ചെയ്യുക</div>
     
-    <input type="text" id="searchInput" placeholder="Search item...">
-    <button onclick="searchHSN()">Search</button>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="ടൈപ്പ് ചെയ്യൂ... (e.g., Milk, Mobile, Hotel)" oninput="showSuggestions(this.value)">
+        <div id="suggestionsBox" class="suggestions"></div>
+    </div>
 
-    <div id="result" class="result-box"></div>
-    <div id="error" class="error-box">മാച്ചസിങ് ആയ വിവരങ്ങൾ ഒന്നും തന്നെ കണ്ടെത്താനായില്ല!</div>
+    <div id="resultCard" class="result-card"></div>
 </div>
 
 <script>
-    // സാമ്പിൾ ഡാറ്റ (ഇതിൽ നിങ്ങൾക്ക് കൂടുതൽ ഐറ്റംസ് ചേർക്കാം)
-    const gstData = [
-        { item: "mobile", code: "8517", type: "HSN", rate: "18%" },
-        { item: "laptop", code: "8471", type: "HSN", rate: "18%" },
-        { item: "computer", code: "8471", type: "HSN", rate: "18%" },
-        { item: "books", code: "4901", type: "HSN", rate: "0%" },
-        { item: "hotel", code: "9963", type: "SAC", rate: "5% / 12% / 18%" },
-        { item: "software", code: "9973", type: "SAC", rate: "18%" },
-        { item: "cement", code: "2523", type: "HSN", rate: "28%" },
-        { item: "rice", code: "1006", type: "HSN", rate: "0% (Unbranded)" }
+    // വിപുലീകരിച്ച ഡാറ്റാബേസ് (ഇതിൽ കൂടുതൽ ഐറ്റംസ് ചേർത്തിട്ടുണ്ട്)
+    const gstDatabase = [
+        { item: "Milk (Fresh/Pasteurized)", code: "0401", type: "HSN", rate: "0% (Exempted)" },
+        { item: "Milk Powder", code: "0402", type: "HSN", rate: "5%" },
+        { item: "Mobile Phones", code: "8517", type: "HSN", rate: "18%" },
+        { item: "Laptop / Computer", code: "8471", type: "HSN", rate: "18%" },
+        { item: "Books / Newspapers", code: "4901", type: "HSN", rate: "0%" },
+        { item: "Hotel Accommodation (< ₹7500)", code: "9963", type: "SAC", rate: "12%" },
+        { item: "Hotel Accommodation (> ₹7500)", code: "9963", type: "SAC", rate: "18%" },
+        { item: "Restaurant Services (Normal)", code: "9963", type: "SAC", rate: "5% (No ITC)" },
+        { item: "Software Development", code: "9973", type: "SAC", rate: "18%" },
+        { item: "Cement", code: "2523", type: "HSN", rate: "28%" },
+        { item: "Rice / Wheat (Unbranded)", code: "1006", type: "HSN", rate: "0%" },
+        { item: "Rice / Wheat (Branded)", code: "1006", type: "HSN", rate: "5%" },
+        { item: "Butter / Ghee / Cheese", code: "0405", type: "HSN", rate: "12%" },
+        { item: "Ice Cream", code: "2105", type: "HSN", rate: "18%" },
+        { item: "Tea / Coffee", code: "0902", type: "HSN", rate: "5%" },
+        { item: "Gold Jewelry", code: "7113", type: "HSN", rate: "3%" }
     ];
 
-    function searchHSN() {
-        const query = document.getElementById("searchInput").value.toLowerCase().trim();
-        const resultBox = document.getElementById("result");
-        const errorBox = document.getElementById("error");
+    const searchInput = document.getElementById('searchInput');
+    const suggestionsBox = document.getElementById('suggestionsBox');
+    const resultCard = document.getElementById('resultCard');
 
-        // പഴയ റിസൾട്ടുകൾ ക്ലിയർ ചെയ്യുക
-        resultBox.style.display = "none";
-        errorBox.style.display = "none";
-
-        if(query === "") {
-            alert("ദയവായി എന്തെങ്കിലും ടൈപ്പ് ചെയ്യുക!");
+    function showSuggestions(value) {
+        const query = value.toLowerCase().trim();
+        suggestionsBox.innerHTML = '';
+        
+        if (query === '') {
+            suggestionsBox.style.display = 'none';
             return;
         }
 
-        // ഡാറ്റയിൽ സെർച്ച് ചെയ്യുക
-        const foundItem = gstData.find(data => data.item.includes(query));
+        // ടൈപ്പ് ചെയ്യുന്ന അക്ഷരങ്ങൾ ഉള്ള ഐറ്റംസ് ഫിൽട്ടർ ചെയ്യുക
+        const matches = gstDatabase.filter(data => data.item.toLowerCase().includes(query));
 
-        if (foundItem) {
-            resultBox.innerHTML = `
-                <h3>ഫലം കണ്ടെത്തീരിക്കുന്നു:</h3>
-                <p><strong>Item:</strong> ${foundItem.item.toUpperCase()}</p>
-                <p><strong>${foundItem.type} Code:</strong> ${foundItem.code}</p>
-                <p><strong>GST Rate:</strong> ${foundItem.rate}</p>
-            `;
-            resultBox.style.display = "block";
+        if (matches.length > 0) {
+            matches.forEach(match => {
+                const div = document.createElement('div');
+                div.innerHTML = match.item;
+                div.onclick = () => selectItem(match);
+                suggestionsBox.appendChild(div);
+            });
+            suggestionsBox.style.display = 'block';
         } else {
-            errorBox.style.display = "block";
+            const div = document.createElement('div');
+            div.innerHTML = "<span style='color:red;'>വിവരങ്ങൾ ലഭ്യമല്ല!</span>";
+            suggestionsBox.appendChild(div);
+            suggestionsBox.style.display = 'block';
         }
     }
+
+    function selectItem(match) {
+        searchInput.value = match.item;
+        suggestionsBox.style.display = 'none';
+
+        // റിസൾട്ട് കാർഡിൽ വിവരങ്ങൾ കാണിക്കുക
+        resultCard.innerHTML = `
+            <h3>${match.item}</h3>
+            <div class="data-row">
+                <span class="label">Code Type</span>
+                <span class="badge">${match.type}</span>
+            </div>
+            <div class="data-row">
+                <span class="label">${match.type} Code</span>
+                <span class="value">${match.code}</span>
+            </div>
+            <div class="data-row">
+                <span class="label">GST Rate</span>
+                <span class="value" style="color: #2563eb;">${match.rate}</span>
+            </div>
+        `;
+        resultCard.style.display = 'block';
+    }
+
+    // ക്ലിക്ക് ചെയ്യുമ്പോൾ സജഷൻ ബോക്സ് മറയ്ക്കാൻ
+    document.addEventListener('click', (e) => {
+        if (e.target !== searchInput) {
+            suggestionsBox.style.display = 'none';
+        }
+    });
 </script>
 
 </body>
